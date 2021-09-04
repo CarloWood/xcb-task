@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.12...3.16)
 
-project(dbus-task
+project(xcb-task
   DESCRIPTION "AIStatefulTask submodule - xcb support"
   LANGUAGES CXX
 )

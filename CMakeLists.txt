@@ -13,11 +13,20 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # DEPENDENCIES
 #
 
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(Libsystemd libsystemd REQUIRED IMPORTED_TARGET)
+include(AICxxProject)
+include(FindPackageHandleStandardArgs)
+
 find_package(magic_enum REQUIRED)
 
-include(AICxxProject)
+find_library(
+  XCB_LIBRARY
+  NAMES xcb
+  PATH_SUFFIXES ${LIBRARY_PATH_PREFIX}
+)
+
+set(XCB_LIBRARIES ${XCB_LIBRARY})
+find_package_handle_standard_args(xcb DEFAULT_MSG XCB_LIBRARY)
+mark_as_advanced(XCB_LIBRARY)
 
 #==============================================================================
 # BUILD PROJECT
@@ -35,6 +44,8 @@ set_property(
 # The list of source files.
 target_sources(xcb-task_ObjLib
   PRIVATE
+    "XcbConnection.cxx"
+    "XcbConnection.h"
     "Connection.cxx"
     "Connection.h"
 )
@@ -49,11 +60,13 @@ target_include_directories(xcb-task_ObjLib
 
 # Set link dependencies.
 target_link_libraries(xcb-task_ObjLib
+  INTERFACE
+    ${XCB_LIBRARY} 
   PUBLIC
     AICxx::statefultask
+    AICxx::xcb-task::OrgFreedesktopXcbError
     farmhash::farmhash
     magic_enum::magic_enum
-    PkgConfig::Libsystemd
 )
 
 # Create an ALIAS target.

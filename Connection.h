@@ -24,7 +24,7 @@ class Connection : public evio::RawInputDevice
   xcb_connection_t* m_connection = nullptr;
   xcb_screen_t* m_screen = nullptr;
   xcb_atom_t m_wm_protocols_atom;
-  xcb_atom_t m_delete_atom;
+  xcb_atom_t m_wm_delete_window_atom;
 
   using handle_to_window_map_container_t = std::map<xcb_window_t, WindowBase*>;
   using handle_to_window_map_t = aithreadsafe::Wrapper<handle_to_window_map_container_t, aithreadsafe::policy::ReadWrite<AIReadWriteSpinLock>>;

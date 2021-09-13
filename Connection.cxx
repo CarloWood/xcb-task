@@ -32,7 +32,7 @@ void Connection::connect(std::string display_name)
 
   xcb_intern_atom_cookie_t  delete_cookie    = xcb_intern_atom(m_connection, 0, 16, "WM_DELETE_WINDOW");
   xcb_intern_atom_reply_t*  delete_reply     = xcb_intern_atom_reply(m_connection, delete_cookie, 0);
-  m_delete_atom = delete_reply->atom;
+  m_wm_delete_window_atom = delete_reply->atom;
   free(delete_reply);
 
   int fd = xcb_get_file_descriptor(m_connection);
@@ -91,7 +91,7 @@ xcb_void_cookie_t Connection::create_main_window(xcb_window_t handle,
     XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8,
     title.size(), title.data());
 
-  xcb_change_property(m_connection, XCB_PROP_MODE_REPLACE, handle, m_wm_protocols_atom, 4, 32, 1, &m_delete_atom);
+  xcb_change_property(m_connection, XCB_PROP_MODE_REPLACE, handle, m_wm_protocols_atom, 4, 32, 1, &m_wm_delete_window_atom);
 
   // Display window.
   xcb_map_window(m_connection, handle);
@@ -460,7 +460,7 @@ void Connection::read_from_fd(int& allow_deletion_count, int fd)
         xcb_client_message_event_t* client_message_event = (xcb_client_message_event_t*)event;
         if (client_message_event->format == 32 &&
             client_message_event->type == m_wm_protocols_atom &&
-            client_message_event->data.data32[0] == m_delete_atom)
+            client_message_event->data.data32[0] == m_wm_delete_window_atom)
         {
           uint32_t timestamp = client_message_event->data.data32[1];
           lookup(client_message_event->window)->On_WM_DELETE_WINDOW(timestamp);

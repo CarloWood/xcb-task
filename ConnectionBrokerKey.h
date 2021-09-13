@@ -1,6 +1,7 @@
 #pragma once
 
-#include "Connection.h"
+#include "ConnectionData.h"
+#include "XcbConnection.h"
 #include "statefultask/BrokerKey.h"
 #include <farmhash.h>
 

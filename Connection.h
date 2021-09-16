@@ -59,8 +59,13 @@ class Connection : public evio::RawInputDevice
   // Destroy a window using its ID (as returned by generate_id.
   void destroy_window(xcb_window_t handle) const
   {
+    DoutEntering(dc::notice, "xcb::Connection::destroy_window(" << handle << ")");
     if (m_connection)
+    {
+      Dout(dc::notice, "Calling xcb_destroy_window(" << m_connection << ", " << handle << ")");
       xcb_destroy_window(m_connection, handle);
+      xcb_flush(m_connection);
+    }
   }
 
   auto white_pixel() const

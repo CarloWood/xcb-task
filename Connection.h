@@ -31,7 +31,10 @@ class Connection : public evio::RawInputDevice
 
   handle_to_window_map_t m_handle_to_window_map;
 
+  std::function<void()> m_cb_closed;
+
  public:
+  void set_closed_callback(std::function<void()> cb_closed) { m_cb_closed = std::move(cb_closed); }
   void connect(std::string display_name);
   void close();
 
@@ -47,6 +50,9 @@ class Connection : public evio::RawInputDevice
   // Map handle to window.
   void add(xcb_window_t handle, WindowBase* window);
 
+  // Remove handle from the map. Return true if this was the last window.
+  bool remove(xcb_window_t handle);
+
   // Look up the WindowBase* that was added with `add`.
   WindowBase* lookup(xcb_window_t handle) const;
 
@@ -57,7 +63,7 @@ class Connection : public evio::RawInputDevice
       uint16_t border_width, uint16_t _class, uint32_t value_mask, std::vector<uint32_t> const& value_list) const;
 
   // Destroy a window using its ID (as returned by generate_id.
-  void destroy_window(xcb_window_t handle) const
+  void destroy_window(xcb_window_t handle)
   {
     DoutEntering(dc::notice, "xcb::Connection::destroy_window(" << handle << ")");
     if (m_connection)
@@ -66,6 +72,7 @@ class Connection : public evio::RawInputDevice
       xcb_destroy_window(m_connection, handle);
       xcb_flush(m_connection);
     }
+    destroyed(handle);
   }
 
   auto white_pixel() const
@@ -79,9 +86,12 @@ class Connection : public evio::RawInputDevice
 #endif
 
  private:
+  void destroyed(xcb_window_t handle);
+
   void read_from_fd(int& allow_deletion_count, int fd) override final;
   void hup(int& UNUSED_ARG(allow_deletion_count), int UNUSED_ARG(fd)) override final { DoutEntering(dc::notice, "xcb::Connection::hup"); }
   void err(int& UNUSED_ARG(allow_deletion_count), int UNUSED_ARG(fd)) override final { DoutEntering(dc::notice, "xcb::Connection::err"); close(); }
+  void closed(int& allow_deletion_count) override final { m_cb_closed(); }
 };
 
 } // namespace xcb

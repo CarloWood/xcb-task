@@ -61,6 +61,22 @@ void Connection::add(xcb_window_t handle, WindowBase* window)
   handle_to_window_map_w->emplace(handle_to_window_map_container_t::value_type{handle, window});
 }
 
+void Connection::destroyed(xcb_window_t handle)
+{
+  handle_to_window_map_t::wat handle_to_window_map_w(m_handle_to_window_map);
+  auto iter = handle_to_window_map_w->find(handle);
+  // Can this ever happen?
+  ASSERT(iter != handle_to_window_map_w->end());
+  iter->second = nullptr;
+}
+
+bool Connection::remove(xcb_window_t handle)
+{
+  handle_to_window_map_t::wat handle_to_window_map_w(m_handle_to_window_map);
+  handle_to_window_map_w->erase(handle);
+  return handle_to_window_map_w->empty();
+}
+
 WindowBase* Connection::lookup(xcb_window_t handle) const
 {
   handle_to_window_map_t::crat handle_to_window_map_r(m_handle_to_window_map);
@@ -268,6 +284,7 @@ void Connection::print_on(std::ostream& os, xcb_generic_event_t const& event) co
     case XCB_DESTROY_NOTIFY:
     {
       xcb_destroy_notify_event_t const& ev = reinterpret_cast<xcb_destroy_notify_event_t const&>(event);
+      os << ", event:" << ev.event << ", window:" << ev.window;
       break;
     }
     case XCB_UNMAP_NOTIFY:
@@ -378,7 +395,8 @@ void Connection::read_from_fd(int& allow_deletion_count, int fd)
 {
   DoutEntering(dc::notice, "xcb::Connection::read_from_fd()");
   bool resize = false;
-  xcb_generic_event_t* event;
+  bool destroyed = false;
+  xcb_generic_event_t const* event;
   while ((event = xcb_poll_for_event(m_connection)))
   {
     Dout(dc::notice, "Processing event " << print_using(*event, [this](std::ostream& os, xcb_generic_event_t const& event_) { print_on(os, event_); }));
@@ -386,9 +404,9 @@ void Connection::read_from_fd(int& allow_deletion_count, int fd)
     // for requests with a reply you have to use the _unchecked version to get the errors delivered here.
     if (AI_UNLIKELY(event->response_type == 0))
     {
-      xcb_generic_error_t* error = (xcb_generic_error_t*)event;
+      xcb_generic_error_t const* error = reinterpret_cast<xcb_generic_error_t const*>(event);
       Dout(dc::warning, "Received X11 error " << error->error_code);
-      free(event);
+      free(const_cast<xcb_generic_event_t*>(event));
       continue;
     }
     // Process events
@@ -397,7 +415,7 @@ void Connection::read_from_fd(int& allow_deletion_count, int fd)
       // Mouse button press
       case XCB_BUTTON_PRESS:
       {
-        xcb_button_press_event_t* ev = (xcb_button_press_event_t*)event;
+        xcb_button_press_event_t const* ev = reinterpret_cast<xcb_button_press_event_t const*>(event);
 
         uint32_t mask = ev->state;
         Dout(dc::notice, print_modifiers(mask));
@@ -425,7 +443,7 @@ void Connection::read_from_fd(int& allow_deletion_count, int fd)
         // Mouse button release
       case XCB_BUTTON_RELEASE:
       {
-        xcb_button_release_event_t* ev = (xcb_button_release_event_t*)event;
+        xcb_button_release_event_t const* ev = reinterpret_cast<xcb_button_release_event_t const*>(event);
         Dout(dc::notice, print_modifiers(ev->state));
         Dout(dc::notice, "Button " << ev->detail << "released in window " << ev->event << ", at coordinates (" << ev->event_x << ", " << ev->event_y << ")");
 
@@ -441,7 +459,7 @@ void Connection::read_from_fd(int& allow_deletion_count, int fd)
         // Resize
       case XCB_CONFIGURE_NOTIFY:
       {
-        xcb_configure_notify_event_t* configure_event = (xcb_configure_notify_event_t*)event;
+        xcb_configure_notify_event_t const* configure_event = reinterpret_cast<xcb_configure_notify_event_t const*>(event);
         static uint16_t width = configure_event->width;
         static uint16_t height = configure_event->height;
 
@@ -457,21 +475,42 @@ void Connection::read_from_fd(int& allow_deletion_count, int fd)
         // Close
       case XCB_CLIENT_MESSAGE:
       {
-        xcb_client_message_event_t* client_message_event = (xcb_client_message_event_t*)event;
+        xcb_client_message_event_t const* client_message_event = reinterpret_cast<xcb_client_message_event_t const*>(event);
         if (client_message_event->format == 32 &&
             client_message_event->type == m_wm_protocols_atom &&
             client_message_event->data.data32[0] == m_wm_delete_window_atom)
         {
           uint32_t timestamp = client_message_event->data.data32[1];
-          lookup(client_message_event->window)->On_WM_DELETE_WINDOW(timestamp);
+          WindowBase* window = lookup(client_message_event->window);
+          if (AI_LIKELY(window))
+            window->On_WM_DELETE_WINDOW(timestamp);
         }
         break;
       }
       case XCB_KEY_PRESS:
 //        loop = false;
         break;
+      case XCB_DESTROY_NOTIFY:
+      {
+        xcb_destroy_notify_event_t const* destroy_notify_event = reinterpret_cast<xcb_destroy_notify_event_t const*>(event);
+#ifdef CWDEBUG
+        WindowBase* window = lookup(destroy_notify_event->window);
+        // destroyed should have been called before we can receive this message!?
+        ASSERT(window == nullptr);
+#endif
+        if (remove(destroy_notify_event->window))
+        {
+          destroyed = true;
+          close();
+        }
+
+        break;
+      }
     }
-    free(event);
+    free(const_cast<xcb_generic_event_t*>(event));
+
+    if (AI_UNLIKELY(destroyed))
+      break;
   }
 }
 

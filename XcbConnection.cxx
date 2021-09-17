@@ -14,7 +14,7 @@ namespace task {
 XcbConnection::XcbConnection(CWDEBUG_ONLY(bool debug)) CWDEBUG_ONLY(: AIStatefulTask(debug))
 {
   DoutEntering(dc::statefultask(mSMDebug), "XcbConnection() [" << (void*)this << "]");
-  m_connection = evio::create<xcb::Connection>(/*this*/);
+  m_connection = evio::create<xcb::Connection>();
 }
 
 void XcbConnection::close()

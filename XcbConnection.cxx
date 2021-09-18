@@ -11,10 +11,11 @@
 
 namespace task {
 
-XcbConnection::XcbConnection(CWDEBUG_ONLY(bool debug)) CWDEBUG_ONLY(: AIStatefulTask(debug))
+XcbConnection::XcbConnection(CWDEBUG_ONLY(bool debug,) std::function<void()> cb_closed) CWDEBUG_ONLY(: AIStatefulTask(debug))
 {
   DoutEntering(dc::statefultask(mSMDebug), "XcbConnection() [" << (void*)this << "]");
   m_connection = evio::create<xcb::Connection>();
+  m_connection->set_closed_callback(std::move(cb_closed));
 }
 
 void XcbConnection::close()
@@ -82,7 +83,7 @@ unsigned int read_unsigned_int(char const*& ptr)
 
 } // namespace
 
-void ConnectionData::initialize(task::XcbConnection& xcb_connection) const
+std::string ConnectionData::get_canonical_display_name() const
 {
   std::string display_name = m_display_name;
 
@@ -122,9 +123,17 @@ void ConnectionData::initialize(task::XcbConnection& xcb_connection) const
     THROW_ALERT("Parse error scanning DISPLAY name \"[DISPLAY]\"", AIArgs("[DISPLAY]", display_name), error);
   }
 
-  // Store the result.
-  if (m_display_name != display_name)
-    xcb_connection.set_display_name(display_name);
+  return display_name;
+}
+
+void ConnectionData::initialize(task::XcbConnection& xcb_connection) const
+{
+  std::string canonical_display_name = get_canonical_display_name();
+  if (canonical_display_name != m_display_name)
+  {
+    // Store the result.
+    xcb_connection.set_display_name(canonical_display_name);
+  }
 }
 
 void ConnectionData::print_on(std::ostream& os) const

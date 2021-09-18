@@ -31,13 +31,15 @@ class ConnectionData
   }
 
  public:
+  std::string get_canonical_display_name() const;
+
   // Set the X server DISPLAY that we should connect to.
   void set_display_name(std::string display_name)
   {
-    DoutEntering(dc::notice, "set_display_name(\"" << display_name << "\")");
+    DoutEntering(dc::notice, "ConnectionData::set_display_name(\"" << display_name << "\")");
     m_display_name = std::move(display_name);
     if (m_display_name.empty())
-      THROW_ALERT("Attempting to set an empty DISPLAY name.");
+      THROW_ALERT("Attempting to set an empty DISPLAY name");
   }
 
 #ifdef CWDEBUG

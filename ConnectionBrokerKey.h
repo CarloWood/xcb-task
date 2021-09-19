@@ -21,11 +21,9 @@ class ConnectionBrokerKey : public statefultask::BrokerKey, public ConnectionDat
     ConnectionData::initialize(xcb_connection);
   }
 
-  unique_ptr canonical_copy() const final
+  unique_ptr copy() const final
   {
-    auto new_key = new ConnectionBrokerKey(*this);
-    new_key->m_display_name = get_canonical_display_name();
-    return unique_ptr(new_key);
+    return unique_ptr(new ConnectionBrokerKey(*this));
   }
 
   bool equal_to_impl(BrokerKey const& other) const final

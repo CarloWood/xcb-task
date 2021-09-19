@@ -83,7 +83,7 @@ unsigned int read_unsigned_int(char const*& ptr)
 
 } // namespace
 
-std::string ConnectionData::get_canonical_display_name() const
+void ConnectionData::canonicalize()
 {
   std::string display_name = m_display_name;
 
@@ -123,17 +123,13 @@ std::string ConnectionData::get_canonical_display_name() const
     THROW_ALERT("Parse error scanning DISPLAY name \"[DISPLAY]\"", AIArgs("[DISPLAY]", display_name), error);
   }
 
-  return display_name;
+  m_display_name = display_name;
 }
 
 void ConnectionData::initialize(task::XcbConnection& xcb_connection) const
 {
-  std::string canonical_display_name = get_canonical_display_name();
-  if (canonical_display_name != m_display_name)
-  {
-    // Store the result.
-    xcb_connection.set_display_name(canonical_display_name);
-  }
+  // Store the canonical display name also in the XcbConnection object.
+  xcb_connection.set_display_name(m_display_name);
 }
 
 void ConnectionData::print_on(std::ostream& os) const

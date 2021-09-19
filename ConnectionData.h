@@ -31,7 +31,7 @@ class ConnectionData
   }
 
  public:
-  std::string get_canonical_display_name() const;
+  void canonicalize();
 
   // Set the X server DISPLAY that we should connect to.
   void set_display_name(std::string display_name)

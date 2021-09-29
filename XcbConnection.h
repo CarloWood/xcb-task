@@ -31,7 +31,7 @@ class XcbConnection : public AIStatefulTask, public xcb::ConnectionData
 
  public:
   /// One beyond the largest state of this task.
-  static state_type constexpr state_end = XcbConnection_done + 1;
+  static constexpr state_type state_end = XcbConnection_done + 1;
 
   /// Construct a XcbConnection object.
   XcbConnection(CWDEBUG_ONLY(bool debug,) std::function<void()> cb_closed);

@@ -80,6 +80,12 @@ class Connection : public evio::RawInputDevice
     return m_screen->white_pixel;
   }
 
+  // Raw access.
+  operator xcb_connection_t*() const
+  {
+    return m_connection;
+  }
+
 #ifdef CWDEBUG
   void print_on(std::ostream& os, xcb_generic_event_t const& event) const;
   std::string print_atom(xcb_atom_t atom) const;

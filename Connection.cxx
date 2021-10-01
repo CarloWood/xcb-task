@@ -101,7 +101,6 @@ xcb_void_cookie_t Connection::create_main_window(xcb_window_t handle,
   xcb_void_cookie_t ret = xcb_create_window(m_connection, XCB_COPY_FROM_PARENT, handle, m_screen->root,
       x, y, width, height,
       border_width, _class, m_screen->root_visual, value_mask, value_list.data());
-  xcb_flush(m_connection);
 
   xcb_change_property(m_connection, XCB_PROP_MODE_REPLACE, handle,
     XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8,
@@ -189,9 +188,12 @@ char const* response_type_to_string(uint8_t response_type)
 std::string Connection::print_atom(xcb_atom_t atom) const
 {
   xcb_get_atom_name_cookie_t atom_name_cookie = xcb_get_atom_name(m_connection, atom);
-  xcb_generic_error_t* error;
-  xcb_get_atom_name_reply_t* atom_name_cookie_reply = xcb_get_atom_name_reply(m_connection, atom_name_cookie, &error);
-  return xcb_get_atom_name_name(atom_name_cookie_reply);
+  xcb_get_atom_name_reply_t* reply = xcb_get_atom_name_reply(m_connection, atom_name_cookie, nullptr);
+  if (!reply)
+    return {};
+  std::string atom_name_str(xcb_get_atom_name_name(reply), xcb_get_atom_name_name_length(reply));
+  free(reply);
+  return atom_name_str;
 }
 
 void Connection::print_on(std::ostream& os, xcb_generic_event_t const& event) const

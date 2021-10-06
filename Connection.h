@@ -62,7 +62,7 @@ class Connection : public evio::RawInputDevice
       std::string_view const& title,
       uint16_t border_width, uint16_t _class, uint32_t value_mask, std::vector<uint32_t> const& value_list) const;
 
-  // Destroy a window using its ID (as returned by generate_id.
+  // Destroy a window using its ID (as returned by generate_id).
   void destroy_window(xcb_window_t handle)
   {
     DoutEntering(dc::notice, "xcb::Connection::destroy_window(" << handle << ")");

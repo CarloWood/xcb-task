@@ -396,7 +396,6 @@ void Connection::print_on(std::ostream& os, xcb_generic_event_t const& event) co
 void Connection::read_from_fd(int& allow_deletion_count, int fd)
 {
   DoutEntering(dc::notice, "xcb::Connection::read_from_fd()");
-  bool resize = false;
   bool destroyed = false;
   xcb_generic_event_t const* event;
   while ((event = xcb_poll_for_event(m_connection)))
@@ -462,15 +461,22 @@ void Connection::read_from_fd(int& allow_deletion_count, int fd)
       case XCB_CONFIGURE_NOTIFY:
       {
         xcb_configure_notify_event_t const* configure_event = reinterpret_cast<xcb_configure_notify_event_t const*>(event);
-        static uint16_t width = configure_event->width;
-        static uint16_t height = configure_event->height;
+        static uint16_t s_width = 0;
+        static uint16_t s_height = 0;
 
-        if (((configure_event->width > 0) && (width != configure_event->width)) ||
-          ((configure_event->height > 0) && (height != configure_event->height)))
+        if (((configure_event->width > 0) && (s_width != configure_event->width)) ||
+          ((configure_event->height > 0) && (s_height != configure_event->height)))
         {
-          resize = true;
-          width = configure_event->width;
-          height = configure_event->height;
+          WindowBase* window = lookup(configure_event->window);
+          uint32_t last_width;
+          uint32_t last_height;
+          window->get_extent(last_width, last_height);
+          if (configure_event->width != last_width ||
+              configure_event->height != last_height)
+            window->OnWindowSizeChanged(configure_event->width, configure_event->height);
+
+          s_width = configure_event->width;
+          s_height = configure_event->height;
         }
         break;
       }
@@ -501,10 +507,7 @@ void Connection::read_from_fd(int& allow_deletion_count, int fd)
         ASSERT(window == nullptr);
 #endif
         if (remove(destroy_notify_event->window))
-        {
           destroyed = true;
-          close();
-        }
 
         break;
       }

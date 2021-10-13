@@ -34,7 +34,7 @@ class XcbConnection : public AIStatefulTask, public xcb::ConnectionData
   static constexpr state_type state_end = XcbConnection_done + 1;
 
   /// Construct a XcbConnection object.
-  XcbConnection(CWDEBUG_ONLY(bool debug,) std::function<void()> cb_closed);
+  XcbConnection(CWDEBUG_ONLY(bool debug));
 
   boost::intrusive_ptr<xcb::Connection> const& connection() const
   {

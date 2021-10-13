@@ -31,10 +31,7 @@ class Connection : public evio::RawInputDevice
 
   handle_to_window_map_t m_handle_to_window_map;
 
-  std::function<void()> m_cb_closed;
-
  public:
-  void set_closed_callback(std::function<void()> cb_closed) { m_cb_closed = std::move(cb_closed); }
   void connect(std::string display_name);
   void close();
 
@@ -97,7 +94,6 @@ class Connection : public evio::RawInputDevice
   void read_from_fd(int& allow_deletion_count, int fd) override final;
   void hup(int& UNUSED_ARG(allow_deletion_count), int UNUSED_ARG(fd)) override final { DoutEntering(dc::notice, "xcb::Connection::hup"); }
   void err(int& UNUSED_ARG(allow_deletion_count), int UNUSED_ARG(fd)) override final { DoutEntering(dc::notice, "xcb::Connection::err"); close(); }
-  void closed(int& allow_deletion_count) override final { m_cb_closed(); }
 };
 
 } // namespace xcb

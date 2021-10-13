@@ -11,11 +11,10 @@
 
 namespace task {
 
-XcbConnection::XcbConnection(CWDEBUG_ONLY(bool debug,) std::function<void()> cb_closed) CWDEBUG_ONLY(: AIStatefulTask(debug))
+XcbConnection::XcbConnection(CWDEBUG_ONLY(bool debug)) : AIStatefulTask(CWDEBUG_ONLY(debug))
 {
   DoutEntering(dc::statefultask(mSMDebug), "XcbConnection() [" << (void*)this << "]");
   m_connection = evio::create<xcb::Connection>();
-  m_connection->set_closed_callback(std::move(cb_closed));
 }
 
 void XcbConnection::close()

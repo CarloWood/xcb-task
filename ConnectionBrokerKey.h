@@ -32,10 +32,12 @@ class ConnectionBrokerKey : public statefultask::BrokerKey, public ConnectionDat
     return ConnectionData::operator==(data);
   }
 
+#ifdef CWDEBUG
   void print_on(std::ostream& os) const final
   {
     ConnectionData::print_on(os);
   }
+#endif
 };
 
 } // namespace xcb

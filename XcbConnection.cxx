@@ -60,7 +60,6 @@ void XcbConnection::multiplex_impl(state_type run_state)
 
 } // namespace task
 
-#ifdef CWDEBUG
 namespace xcb {
 
 namespace {
@@ -131,10 +130,11 @@ void ConnectionData::initialize(task::XcbConnection& xcb_connection) const
   xcb_connection.set_display_name(m_display_name);
 }
 
+#ifdef CWDEBUG
 void ConnectionData::print_on(std::ostream& os) const
 {
   os << "{\"" << m_display_name << "\"}";
 }
+#endif
 
 } // namespace xcb
-#endif

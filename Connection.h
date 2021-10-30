@@ -25,6 +25,10 @@ class Connection : public evio::RawInputDevice
   xcb_screen_t* m_screen = nullptr;
   xcb_atom_t m_wm_protocols_atom;
   xcb_atom_t m_wm_delete_window_atom;
+  uint16_t m_width = 0;                         // The width/height of the last XCB_CONFIGURE_NOTIFY that was received.
+  uint16_t m_height = 0;                        // That can be for any window, but since resizing usually happens for
+                                                // one window at a time it can still be used to improve performance a
+                                                // tiny bit.
 
   using handle_to_window_map_container_t = std::map<xcb_window_t, WindowBase*>;
   using handle_to_window_map_t = aithreadsafe::Wrapper<handle_to_window_map_container_t, aithreadsafe::policy::ReadWrite<AIReadWriteSpinLock>>;

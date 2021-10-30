@@ -461,22 +461,17 @@ void Connection::read_from_fd(int& allow_deletion_count, int fd)
       case XCB_CONFIGURE_NOTIFY:
       {
         xcb_configure_notify_event_t const* configure_event = reinterpret_cast<xcb_configure_notify_event_t const*>(event);
-        static uint16_t s_width = 0;
-        static uint16_t s_height = 0;
 
-        if (((configure_event->width > 0) && (s_width != configure_event->width)) ||
-          ((configure_event->height > 0) && (s_height != configure_event->height)))
+        // Only call OnWindowSizeChanged when the extent differs from the last one that we received (and isn't zero).
+        // Since that could be for another window, this is not a guarantee that OnWindowSizeChanged
+        // is only called when the extent of window actually changed. But at least it is some improvement.
+        if (((configure_event->width > 0) && (m_width != configure_event->width)) ||
+          ((configure_event->height > 0) && (m_height != configure_event->height)))
         {
           WindowBase* window = lookup(configure_event->window);
-          uint32_t last_width;
-          uint32_t last_height;
-          window->get_extent(last_width, last_height);
-          if (configure_event->width != last_width ||
-              configure_event->height != last_height)
-            window->OnWindowSizeChanged(configure_event->width, configure_event->height);
-
-          s_width = configure_event->width;
-          s_height = configure_event->height;
+          window->OnWindowSizeChanged(configure_event->width, configure_event->height);
+          m_width = configure_event->width;
+          m_height = configure_event->height;
         }
         break;
       }

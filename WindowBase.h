@@ -7,7 +7,7 @@ namespace xcb {
 class WindowBase
 {
  public:
-  virtual void OnWindowSizeChanged(uint32_t width, uint32_t height) = 0;        // Called whenever the window changed size.
+  virtual void on_window_size_changed(uint32_t width, uint32_t height) = 0;        // Called whenever the window changed size.
 
   virtual void MouseMove(int x, int y) = 0;
   virtual void MouseClick(size_t button, bool pressed) = 0;

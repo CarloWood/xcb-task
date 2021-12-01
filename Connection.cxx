@@ -430,14 +430,12 @@ void Connection::read_from_fd(int& allow_deletion_count, int fd)
             Dout(dc::notice, "Wheel Button down in window " << ev->event << ", at coordinates (" << ev->event_x << ", " << ev->event_y << ")");
             break;
           default:
+          {
             Dout(dc::notice, "Button " << ev->detail << "pressed in window " << ev->event << ", at coordinates (" << ev->event_x << ", " << ev->event_y << ")");
-#if 0
-            project.MouseMove(ev->event_x, ev->event_y);
-            if (ev->detail == 1)
-              project.MouseClick(0, true);
-            else if (ev->detail == 3)
-              project.MouseClick(1, true);
-#endif
+            WindowBase* window = lookup(ev->event);
+            window->MouseMove(ev->event_x, ev->event_y);
+            window->MouseClick(ev->detail, true);
+          }
         }
         break;
       }
@@ -447,14 +445,9 @@ void Connection::read_from_fd(int& allow_deletion_count, int fd)
         xcb_button_release_event_t const* ev = reinterpret_cast<xcb_button_release_event_t const*>(event);
         Dout(dc::notice, print_modifiers(ev->state));
         Dout(dc::notice, "Button " << ev->detail << "released in window " << ev->event << ", at coordinates (" << ev->event_x << ", " << ev->event_y << ")");
-
-#if 0
-        project.MouseMove(ev->event_x, ev->event_y);
-        if (ev->detail == 1)
-          project.MouseClick(0, false);
-        else if (ev->detail == 3)
-          project.MouseClick(1, false);
-#endif
+        WindowBase* window = lookup(ev->event);
+        window->MouseMove(ev->event_x, ev->event_y);
+        window->MouseClick(ev->detail, false);
         break;
       }
         // Resize

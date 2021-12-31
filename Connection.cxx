@@ -292,11 +292,13 @@ void Connection::print_on(std::ostream& os, xcb_generic_event_t const& event) co
     case XCB_UNMAP_NOTIFY:
     {
       xcb_unmap_notify_event_t const& ev = reinterpret_cast<xcb_unmap_notify_event_t const&>(event);
+      os << ", event:" << ev.event << ", window:" << ev.window << ", from_configure:" << (int)ev.from_configure;
       break;
     }
     case XCB_MAP_NOTIFY:
     {
       xcb_map_notify_event_t const& ev = reinterpret_cast<xcb_map_notify_event_t const&>(event);
+      os << ", event:" << ev.event << ", window:" << ev.window << ", override_redirect:" << (int)ev.override_redirect;
       break;
     }
     case XCB_MAP_REQUEST:
@@ -448,6 +450,24 @@ void Connection::read_from_fd(int& allow_deletion_count, int fd)
         WindowBase* window = lookup(ev->event);
         window->MouseMove(ev->event_x, ev->event_y);
         window->MouseClick(ev->detail, false);
+        break;
+      }
+        // Minimize
+      case XCB_UNMAP_NOTIFY:
+      {
+        xcb_unmap_notify_event_t const* unmap_event = reinterpret_cast<xcb_unmap_notify_event_t const*>(event);
+        WindowBase* window = lookup(unmap_event->window);
+        // The window can already be destroyed (this unmap is then the result of that).
+        if (window)
+          window->on_map_changed(true);
+        break;
+      }
+        // Unminimize
+      case XCB_MAP_NOTIFY:
+      {
+        xcb_map_notify_event_t const* map_event = reinterpret_cast<xcb_map_notify_event_t const*>(event);
+        WindowBase* window = lookup(map_event->window);
+        window->on_map_changed(false);
         break;
       }
         // Resize

@@ -37,6 +37,12 @@ class ConnectionBrokerKey : public statefultask::BrokerKey, public ConnectionDat
   {
     ConnectionData::print_on(os);
   }
+
+  friend std::ostream& operator<<(std::ostream& os, ConnectionBrokerKey const& connection_broker_key)
+  {
+    connection_broker_key.print_on(os);
+    return os;
+  }
 #endif
 };
 

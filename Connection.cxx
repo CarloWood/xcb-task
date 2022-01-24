@@ -5,6 +5,13 @@
 #include <libcwd/buf2str.h>
 #endif
 
+#if defined(CWDEBUG) && !defined(DOXYGEN)
+NAMESPACE_DEBUG_CHANNELS_START
+channel_ct xcb("XCB");
+channel_ct xcbmotion("XCBMOTION");
+NAMESPACE_DEBUG_CHANNELS_END
+#endif
+
 namespace xcb {
 
 void Connection::connect(std::string display_name)
@@ -180,6 +187,85 @@ char const* response_type_to_string(uint8_t response_type)
   }
   return "<UNKNOWN RESPONSE TYPE>";
 }
+
+struct PrintKeyCode
+{
+  xcb_keycode_t m_code;         // uint8_t
+
+  PrintKeyCode(xcb_keycode_t code) : m_code(code) { }
+
+  void print_on(std::ostream& os) const
+  {
+    os << "'" << libcwd::char2str(m_code) << "'";
+  }
+};
+
+PrintKeyCode print_keycode(xcb_keycode_t code)
+{
+  return { code };
+}
+
+struct PrintTimestamp
+{
+  xcb_timestamp_t m_time;       // uint32_t
+
+  PrintTimestamp(xcb_timestamp_t time) : m_time(time) { }
+
+  void print_on(std::ostream& os) const
+  {
+    os << m_time;
+  }
+};
+
+PrintTimestamp print_timestamp(xcb_timestamp_t time)
+{
+  return { time };
+}
+
+struct PrintWindow
+{
+  xcb_window_t m_window;
+
+  PrintWindow(xcb_window_t window) : m_window(window) { }
+
+  void print_on(std::ostream& os) const
+  {
+    os << m_window;
+  }
+};
+
+PrintWindow print_window(xcb_window_t window)
+{
+  return { window };
+}
+
+void print_keycode_time_window_ids_to(std::ostream& os, xcb_keycode_t detail, xcb_timestamp_t timestamp, xcb_window_t root, xcb_window_t event, xcb_window_t child)
+{
+  os << ", detail:" << print_keycode(detail) << ", time:" << print_timestamp(timestamp) <<
+    ", root:" << print_window(root) << ", event:" << print_window(event) << ", child:" << print_window(child);
+}
+
+void print_detail_time_window_ids_to(std::ostream& os, uint8_t detail, xcb_timestamp_t timestamp, xcb_window_t root, xcb_window_t event, xcb_window_t child)
+{
+  os << ", detail:" << (int)detail << ", time:" << print_timestamp(timestamp) <<
+    ", root:" << print_window(root) << ", event:" << print_window(event) << ", child:" << print_window(child);
+}
+
+void print_root_event_state_to(std::ostream& os, int16_t root_x, int16_t root_y, int16_t event_x, int16_t event_y, uint16_t state, uint8_t same_screen)
+{
+  os <<
+    ", root_x:" << root_x <<
+    ", root_y:" << root_y <<
+    ", event_x:" << event_x <<
+    ", event_y:" << event_y <<
+    ", state:" << state <<
+    ", same_screen:" << (int)same_screen;
+}
+
+void print_focus_event_to(std::ostream& os, uint8_t detail, xcb_window_t event, uint8_t mode)
+{
+  os << ", detail:" << (int)detail << ", event:" << print_window(event) << ", mode:" << (int)mode;
+}
 #endif
 
 } // namespace
@@ -208,52 +294,68 @@ void Connection::print_on(std::ostream& os, xcb_generic_event_t const& event) co
     case XCB_KEY_PRESS:
     {
       xcb_key_press_event_t const& ev = reinterpret_cast<xcb_key_press_event_t const&>(event);
-
+      print_keycode_time_window_ids_to(os, ev.detail, ev.time, ev.root, ev.event, ev.child);
+      print_root_event_state_to(os, ev.root_x, ev.root_y, ev.event_x, ev.event_y, ev.state, ev.same_screen);
       break;
     }
     case XCB_KEY_RELEASE:
     {
       xcb_key_release_event_t const& ev = reinterpret_cast<xcb_key_release_event_t const&>(event);
+      print_keycode_time_window_ids_to(os, ev.detail, ev.time, ev.root, ev.event, ev.child);
+      print_root_event_state_to(os, ev.root_x, ev.root_y, ev.event_x, ev.event_y, ev.state, ev.same_screen);
       break;
     }
     case XCB_BUTTON_PRESS:
     {
       xcb_button_press_event_t const& ev = reinterpret_cast<xcb_button_press_event_t const&>(event);
+      print_detail_time_window_ids_to(os, ev.detail, ev.time, ev.root, ev.event, ev.child);
+      print_root_event_state_to(os, ev.root_x, ev.root_y, ev.event_x, ev.event_y, ev.state, ev.same_screen);
       break;
     }
     case XCB_BUTTON_RELEASE:
     {
       xcb_button_release_event_t const& ev = reinterpret_cast<xcb_button_release_event_t const&>(event);
+      print_detail_time_window_ids_to(os, ev.detail, ev.time, ev.root, ev.event, ev.child);
+      print_root_event_state_to(os, ev.root_x, ev.root_y, ev.event_x, ev.event_y, ev.state, ev.same_screen);
       break;
     }
     case XCB_MOTION_NOTIFY:
     {
       xcb_motion_notify_event_t const& ev = reinterpret_cast<xcb_motion_notify_event_t const&>(event);
+      print_detail_time_window_ids_to(os, ev.detail, ev.time, ev.root, ev.event, ev.child);
+      print_root_event_state_to(os, ev.root_x, ev.root_y, ev.event_x, ev.event_y, ev.state, ev.same_screen);
       break;
     }
     case XCB_ENTER_NOTIFY:
     {
       xcb_enter_notify_event_t const& ev = reinterpret_cast<xcb_enter_notify_event_t const&>(event);
+      print_detail_time_window_ids_to(os, ev.detail, ev.time, ev.root, ev.event, ev.child);
+      print_root_event_state_to(os, ev.root_x, ev.root_y, ev.event_x, ev.event_y, ev.state, ev.same_screen_focus);
       break;
     }
     case XCB_LEAVE_NOTIFY:
     {
       xcb_leave_notify_event_t const& ev = reinterpret_cast<xcb_leave_notify_event_t const&>(event);
+      print_detail_time_window_ids_to(os, ev.detail, ev.time, ev.root, ev.event, ev.child);
+      print_root_event_state_to(os, ev.root_x, ev.root_y, ev.event_x, ev.event_y, ev.state, ev.same_screen_focus);
       break;
     }
     case XCB_FOCUS_IN:
     {
       xcb_focus_in_event_t const& ev = reinterpret_cast<xcb_focus_in_event_t const&>(event);
+      print_focus_event_to(os, ev.detail, ev.event, ev.mode);
       break;
     }
     case XCB_FOCUS_OUT:
     {
       xcb_focus_out_event_t const& ev = reinterpret_cast<xcb_focus_out_event_t const&>(event);
+      print_focus_event_to(os, ev.detail, ev.event, ev.mode);
       break;
     }
     case XCB_KEYMAP_NOTIFY:
     {
       xcb_keymap_notify_event_t const& ev = reinterpret_cast<xcb_keymap_notify_event_t const&>(event);
+      os << "keys:" << libcwd::buf2str(reinterpret_cast<char const*>(&ev.keys[0]), sizeof(ev.keys));
       break;
     }
     case XCB_EXPOSE:
@@ -313,7 +415,7 @@ void Connection::print_on(std::ostream& os, xcb_generic_event_t const& event) co
     }
     case XCB_CONFIGURE_NOTIFY:
     {
-      // Left-click title bar, draw and release button: moved window.
+      // Left-click title bar, drag and release button: moved window.
       xcb_configure_notify_event_t const& ev = reinterpret_cast<xcb_configure_notify_event_t const&>(event);
       os << ", event:" << ev.event << ", window:" << ev.window << ", above_sibling:" << ev.above_sibling <<
         ", x:" << ev.x << ", y:" << ev.y << ", width:" << ev.width << ", height:" << ev.height <<
@@ -397,12 +499,25 @@ void Connection::print_on(std::ostream& os, xcb_generic_event_t const& event) co
 
 void Connection::read_from_fd(int& allow_deletion_count, int fd)
 {
-  DoutEntering(dc::notice, "xcb::Connection::read_from_fd()");
+#ifdef CWDEBUG
+  // Delay DoutEntering, because we don't want to print anything for just a XCB_MOTION_NOTIFY when dc::xcbmotion is off.
+  NAMESPACE_DEBUG::Indent entering_indent(0);
+#endif
   bool destroyed = false;
   xcb_generic_event_t const* event;
   while ((event = xcb_poll_for_event(m_connection)))
   {
-    Dout(dc::notice, "Processing event " << print_using(*event, [this](std::ostream& os, xcb_generic_event_t const& event_) { print_on(os, event_); }));
+#ifdef CWDEBUG
+    bool is_motion_notify_event = (event->response_type & 0x7f) == XCB_MOTION_NOTIFY;
+    if (entering_indent.M_indent == 0 && (DEBUGCHANNELS::dc::xcbmotion.is_on() || (DEBUGCHANNELS::dc::xcb.is_on() && !is_motion_notify_event)))
+    {
+      Dout(dc::xcb|dc::xcbmotion, "Entering xcb::Connection::read_from_fd()");
+      libcwd::libcw_do.inc_indent(2);
+      entering_indent.M_indent = 2;
+    }
+    Dout(dc::xcb(!is_motion_notify_event)|dc::xcbmotion,
+        "Processing event " << print_using(*event, [this](std::ostream& os, xcb_generic_event_t const& event_) { print_on(os, event_); }));
+#endif
     // Errors of requests which have no reply cause an 'event' with response_type 0 by default,
     // for requests with a reply you have to use the _unchecked version to get the errors delivered here.
     if (AI_UNLIKELY(event->response_type == 0))
@@ -421,19 +536,19 @@ void Connection::read_from_fd(int& allow_deletion_count, int fd)
         xcb_button_press_event_t const* ev = reinterpret_cast<xcb_button_press_event_t const*>(event);
 
         uint32_t mask = ev->state;
-        Dout(dc::notice, print_modifiers(mask));
+        Dout(dc::xcb, print_modifiers(mask));
 
         switch (ev->detail)
         {
           case 4:
-            Dout(dc::notice, "Wheel Button up in window " << ev->event << ", at coordinates (" << ev->event_x << ", " << ev->event_y << ")");
+            Dout(dc::xcb, "Wheel Button up in window " << ev->event << ", at coordinates (" << ev->event_x << ", " << ev->event_y << ")");
             break;
           case 5:
-            Dout(dc::notice, "Wheel Button down in window " << ev->event << ", at coordinates (" << ev->event_x << ", " << ev->event_y << ")");
+            Dout(dc::xcb, "Wheel Button down in window " << ev->event << ", at coordinates (" << ev->event_x << ", " << ev->event_y << ")");
             break;
           default:
           {
-            Dout(dc::notice, "Button " << ev->detail << "pressed in window " << ev->event << ", at coordinates (" << ev->event_x << ", " << ev->event_y << ")");
+            Dout(dc::xcb, "Button " << ev->detail << "pressed in window " << ev->event << ", at coordinates (" << ev->event_x << ", " << ev->event_y << ")");
             WindowBase* window = lookup(ev->event);
             window->MouseMove(ev->event_x, ev->event_y);
             window->MouseClick(ev->detail, true);
@@ -445,8 +560,8 @@ void Connection::read_from_fd(int& allow_deletion_count, int fd)
       case XCB_BUTTON_RELEASE:
       {
         xcb_button_release_event_t const* ev = reinterpret_cast<xcb_button_release_event_t const*>(event);
-        Dout(dc::notice, print_modifiers(ev->state));
-        Dout(dc::notice, "Button " << ev->detail << "released in window " << ev->event << ", at coordinates (" << ev->event_x << ", " << ev->event_y << ")");
+        Dout(dc::xcb, print_modifiers(ev->state));
+        Dout(dc::xcb, "Button " << ev->detail << "released in window " << ev->event << ", at coordinates (" << ev->event_x << ", " << ev->event_y << ")");
         WindowBase* window = lookup(ev->event);
         window->MouseMove(ev->event_x, ev->event_y);
         window->MouseClick(ev->detail, false);

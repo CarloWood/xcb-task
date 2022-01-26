@@ -12,10 +12,6 @@
 #include <vector>
 #include "debug.h"
 
-namespace task {
-
-} // namespace task
-
 namespace xcb {
 
 class Connection : public evio::RawInputDevice

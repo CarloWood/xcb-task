@@ -122,28 +122,36 @@ xcb_void_cookie_t Connection::create_main_window(xcb_window_t handle,
   return ret;
 }
 
-namespace {
-
-#ifdef CWDEBUG
-std::string print_modifiers(uint32_t mask)
+std::string ModifierMask::to_string() const
 {
   static char const* mods[] = {
     "Shift", "Lock", "Ctrl", "Alt",
-    "Mod2", "Mod3", "Mod4", "Mod5",
-    "Button1", "Button2", "Button3", "Button4", "Button5",
+    "Mod2", "Mod3", "Super", "Mod5",
+    "Button1", "Button2", "Button3", "WheelUp", "WheelDown",
     "XXX6", "XXX7", "XXX8"
   };
   char const** mod;
-  std::string result = "Modifier mask:";
+  std::string result;
+  char const* prefix = "";
+  uint32_t mask = m_mask;
   for (mod = mods ; mask; mask >>= 1, mod++)
   {
     if ((mask & 1))
     {
-      result += ' ';
+      result += prefix;
       result += *mod;
+      prefix = "|";
     }
   }
   return result;
+}
+
+namespace {
+
+#ifdef CWDEBUG
+std::string print_modifiers(uint16_t mask)
+{
+  return "Modifier mask: " + ModifierMask{mask}.to_string();
 }
 
 char const* response_type_to_string(uint8_t response_type)
@@ -530,41 +538,24 @@ void Connection::read_from_fd(int& allow_deletion_count, int fd)
     // Process events
     switch (event->response_type & 0x7f)
     {
-      // Mouse button press
+        // Mouse button
       case XCB_BUTTON_PRESS:
-      {
-        xcb_button_press_event_t const* ev = reinterpret_cast<xcb_button_press_event_t const*>(event);
-
-        uint32_t mask = ev->state;
-        Dout(dc::xcb, print_modifiers(mask));
-
-        switch (ev->detail)
-        {
-          case 4:
-            Dout(dc::xcb, "Wheel Button up in window " << ev->event << ", at coordinates (" << ev->event_x << ", " << ev->event_y << ")");
-            break;
-          case 5:
-            Dout(dc::xcb, "Wheel Button down in window " << ev->event << ", at coordinates (" << ev->event_x << ", " << ev->event_y << ")");
-            break;
-          default:
-          {
-            Dout(dc::xcb, "Button " << ev->detail << "pressed in window " << ev->event << ", at coordinates (" << ev->event_x << ", " << ev->event_y << ")");
-            WindowBase* window = lookup(ev->event);
-            window->MouseMove(ev->event_x, ev->event_y);
-            window->MouseClick(ev->detail, true);
-          }
-        }
-        break;
-      }
-        // Mouse button release
       case XCB_BUTTON_RELEASE:
       {
-        xcb_button_release_event_t const* ev = reinterpret_cast<xcb_button_release_event_t const*>(event);
-        Dout(dc::xcb, print_modifiers(ev->state));
-        Dout(dc::xcb, "Button " << ev->detail << "released in window " << ev->event << ", at coordinates (" << ev->event_x << ", " << ev->event_y << ")");
+        // xcb_button_release_event_t is a typedef of xcb_button_press_event_t.
+        xcb_button_press_event_t const* ev = reinterpret_cast<xcb_button_press_event_t const*>(event);
+        bool pressed = (event->response_type & 0x7f) == XCB_BUTTON_PRESS;
+
+        uint32_t modifiers = ev->state;
+        Dout(dc::xcb, print_modifiers(modifiers));
+
+        Dout(dc::xcb, "Button " << ev->detail << (pressed ? "pressed" : "released") << " in window " << ev->event << ", at coordinates (" << ev->event_x << ", " << ev->event_y << ")");
         WindowBase* window = lookup(ev->event);
-        window->MouseMove(ev->event_x, ev->event_y);
-        window->MouseClick(ev->detail, false);
+        int converted_modifiers = 0;
+        if (modifiers)
+          converted_modifiers = window->convert(modifiers);
+        window->MouseMove(ev->event_x, ev->event_y, converted_modifiers);
+        window->MouseClick(ev->detail, pressed, converted_modifiers);
         break;
       }
         // Minimize

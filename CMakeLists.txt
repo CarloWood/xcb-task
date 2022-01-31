@@ -17,16 +17,11 @@ include(AICxxProject)
 include(FindPackageHandleStandardArgs)
 
 find_package(magic_enum REQUIRED)
+find_package(PkgConfig REQUIRED)
 
-find_library(
-  XCB_LIBRARY
-  NAMES xcb
-  PATH_SUFFIXES ${LIBRARY_PATH_PREFIX}
-)
-
-set(XCB_LIBRARIES ${XCB_LIBRARY})
-find_package_handle_standard_args(xcb DEFAULT_MSG XCB_LIBRARY)
-mark_as_advanced(XCB_LIBRARY)
+pkg_check_modules(Libxcb xcb IMPORTED_TARGET)
+pkg_check_modules(Libxkb xkbcommon-x11 IMPORTED_TARGET)
+pkg_check_modules(Libxcb-xkb xcb-xkb IMPORTED_TARGET)
 
 #==============================================================================
 # BUILD PROJECT
@@ -62,6 +57,9 @@ target_include_directories(xcb-task_ObjLib
 target_link_libraries(xcb-task_ObjLib
   INTERFACE
     ${XCB_LIBRARY} 
+    PkgConfig::Libxcb-xkb
+    PkgConfig::Libxcb
+    PkgConfig::Libxkb
   PUBLIC
     AICxx::statefultask
     AICxx::xcb-task::OrgFreedesktopXcbError

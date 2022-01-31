@@ -1,5 +1,7 @@
 #include "sys.h"
 #include "Connection.h"
+#include "Xkb.h"
+#include <X11/extensions/XKBproto.h>    // xkbAnyEvent
 #ifdef CWDEBUG
 #include "utils/popcount.h"
 #include <libcwd/buf2str.h>
@@ -29,6 +31,7 @@ void Connection::connect(std::string display_name)
     m_connection = nullptr;
     THROW_ALERTC(error, "xcb_connect");
   }
+  m_xkb.init(m_connection);
   m_screen = xcb_setup_roots_iterator(xcb_get_setup(m_connection)).data;
 
   // Prepare notification for window destruction.
@@ -154,48 +157,6 @@ std::string print_modifiers(uint16_t mask)
   return "Modifier mask: " + ModifierMask{mask}.to_string();
 }
 
-char const* response_type_to_string(uint8_t response_type)
-{
-  switch (response_type & 0x7f)
-  {
-    AI_CASE_RETURN(XCB_KEY_PRESS);
-    AI_CASE_RETURN(XCB_KEY_RELEASE);
-    AI_CASE_RETURN(XCB_BUTTON_PRESS);
-    AI_CASE_RETURN(XCB_BUTTON_RELEASE);
-    AI_CASE_RETURN(XCB_MOTION_NOTIFY);
-    AI_CASE_RETURN(XCB_ENTER_NOTIFY);
-    AI_CASE_RETURN(XCB_LEAVE_NOTIFY);
-    AI_CASE_RETURN(XCB_FOCUS_IN);
-    AI_CASE_RETURN(XCB_FOCUS_OUT);
-    AI_CASE_RETURN(XCB_KEYMAP_NOTIFY);
-    AI_CASE_RETURN(XCB_EXPOSE);
-    AI_CASE_RETURN(XCB_GRAPHICS_EXPOSURE);
-    AI_CASE_RETURN(XCB_NO_EXPOSURE);
-    AI_CASE_RETURN(XCB_VISIBILITY_NOTIFY);
-    AI_CASE_RETURN(XCB_CREATE_NOTIFY);
-    AI_CASE_RETURN(XCB_DESTROY_NOTIFY);
-    AI_CASE_RETURN(XCB_UNMAP_NOTIFY);
-    AI_CASE_RETURN(XCB_MAP_NOTIFY);
-    AI_CASE_RETURN(XCB_MAP_REQUEST);
-    AI_CASE_RETURN(XCB_REPARENT_NOTIFY);
-    AI_CASE_RETURN(XCB_CONFIGURE_NOTIFY);
-    AI_CASE_RETURN(XCB_CONFIGURE_REQUEST);
-    AI_CASE_RETURN(XCB_GRAVITY_NOTIFY);
-    AI_CASE_RETURN(XCB_RESIZE_REQUEST);
-    AI_CASE_RETURN(XCB_CIRCULATE_NOTIFY);
-    AI_CASE_RETURN(XCB_CIRCULATE_REQUEST);
-    AI_CASE_RETURN(XCB_PROPERTY_NOTIFY);
-    AI_CASE_RETURN(XCB_SELECTION_CLEAR);
-    AI_CASE_RETURN(XCB_SELECTION_REQUEST);
-    AI_CASE_RETURN(XCB_SELECTION_NOTIFY);
-    AI_CASE_RETURN(XCB_COLORMAP_NOTIFY);
-    AI_CASE_RETURN(XCB_CLIENT_MESSAGE);
-    AI_CASE_RETURN(XCB_MAPPING_NOTIFY);
-    AI_CASE_RETURN(XCB_GE_GENERIC);
-  }
-  return "<UNKNOWN RESPONSE TYPE>";
-}
-
 struct PrintKeyCode
 {
   xcb_keycode_t m_code;         // uint8_t
@@ -204,7 +165,7 @@ struct PrintKeyCode
 
   void print_on(std::ostream& os) const
   {
-    os << "'" << libcwd::char2str(m_code) << "'";
+    os << "0x" << std::hex << (int)m_code << std::dec;
   }
 };
 
@@ -247,6 +208,64 @@ PrintWindow print_window(xcb_window_t window)
   return { window };
 }
 
+struct PrintXkbType
+{
+  uint8_t m_xkb_type;
+
+  PrintXkbType(uint8_t xkb_type) : m_xkb_type(xkb_type) { }
+
+  void print_on(std::ostream& os) const
+  {
+    switch (m_xkb_type)
+    {
+      case XCB_XKB_NEW_KEYBOARD_NOTIFY:
+        os << "XCB_XKB_NEW_KEYBOARD_NOTIFY";
+        break;
+      case XCB_XKB_MAP_NOTIFY:
+        os << "XCB_XKB_MAP_NOTIFY";
+        break;
+      case XCB_XKB_STATE_NOTIFY:
+        os << "XCB_XKB_STATE_NOTIFY";
+        break;
+      case XCB_XKB_CONTROLS_NOTIFY:
+        os << "XCB_XKB_CONTROLS_NOTIFY";
+        break;
+      case XCB_XKB_INDICATOR_STATE_NOTIFY:
+        os << "XCB_XKB_INDICATOR_STATE_NOTIFY";
+        break;
+      case XCB_XKB_INDICATOR_MAP_NOTIFY:
+        os << "XCB_XKB_INDICATOR_MAP_NOTIFY";
+        break;
+      case XCB_XKB_NAMES_NOTIFY:
+        os << "XCB_XKB_NAMES_NOTIFY";
+        break;
+      case XCB_XKB_COMPAT_MAP_NOTIFY:
+        os << "XCB_XKB_COMPAT_MAP_NOTIFY";
+        break;
+      case XCB_XKB_BELL_NOTIFY:
+        os << "XCB_XKB_BELL_NOTIFY";
+        break;
+      case XCB_XKB_ACTION_MESSAGE:
+        os << "XCB_XKB_ACTION_MESSAGE";
+        break;
+      case XCB_XKB_ACCESS_X_NOTIFY:
+        os << "XCB_XKB_ACCESS_X_NOTIFY";
+        break;
+      case XCB_XKB_EXTENSION_DEVICE_NOTIFY:
+        os << "XCB_XKB_EXTENSION_DEVICE_NOTIFY";
+        break;
+      default:
+        os << "UNKNOWN XKB TYPE " << (unsigned int)m_xkb_type;
+        break;
+    }
+  }
+};
+
+PrintXkbType print_xkbType(uint8_t xkb_type)
+{
+  return { xkb_type };
+}
+
 void print_keycode_time_window_ids_to(std::ostream& os, xcb_keycode_t detail, xcb_timestamp_t timestamp, xcb_window_t root, xcb_window_t event, xcb_window_t child)
 {
   os << ", detail:" << print_keycode(detail) << ", time:" << print_timestamp(timestamp) <<
@@ -279,6 +298,53 @@ void print_focus_event_to(std::ostream& os, uint8_t detail, xcb_window_t event, 
 } // namespace
 
 #ifdef CWDEBUG
+char const* Connection::response_type_to_string(uint8_t response_type) const
+{
+  uint8_t rt = response_type & 0x7f;
+  switch (rt)
+  {
+    AI_CASE_RETURN(XCB_KEY_PRESS);
+    AI_CASE_RETURN(XCB_KEY_RELEASE);
+    AI_CASE_RETURN(XCB_BUTTON_PRESS);
+    AI_CASE_RETURN(XCB_BUTTON_RELEASE);
+    AI_CASE_RETURN(XCB_MOTION_NOTIFY);
+    AI_CASE_RETURN(XCB_ENTER_NOTIFY);
+    AI_CASE_RETURN(XCB_LEAVE_NOTIFY);
+    AI_CASE_RETURN(XCB_FOCUS_IN);
+    AI_CASE_RETURN(XCB_FOCUS_OUT);
+    AI_CASE_RETURN(XCB_KEYMAP_NOTIFY);
+    AI_CASE_RETURN(XCB_EXPOSE);
+    AI_CASE_RETURN(XCB_GRAPHICS_EXPOSURE);
+    AI_CASE_RETURN(XCB_NO_EXPOSURE);
+    AI_CASE_RETURN(XCB_VISIBILITY_NOTIFY);
+    AI_CASE_RETURN(XCB_CREATE_NOTIFY);
+    AI_CASE_RETURN(XCB_DESTROY_NOTIFY);
+    AI_CASE_RETURN(XCB_UNMAP_NOTIFY);
+    AI_CASE_RETURN(XCB_MAP_NOTIFY);
+    AI_CASE_RETURN(XCB_MAP_REQUEST);
+    AI_CASE_RETURN(XCB_REPARENT_NOTIFY);
+    AI_CASE_RETURN(XCB_CONFIGURE_NOTIFY);
+    AI_CASE_RETURN(XCB_CONFIGURE_REQUEST);
+    AI_CASE_RETURN(XCB_GRAVITY_NOTIFY);
+    AI_CASE_RETURN(XCB_RESIZE_REQUEST);
+    AI_CASE_RETURN(XCB_CIRCULATE_NOTIFY);
+    AI_CASE_RETURN(XCB_CIRCULATE_REQUEST);
+    AI_CASE_RETURN(XCB_PROPERTY_NOTIFY);
+    AI_CASE_RETURN(XCB_SELECTION_CLEAR);
+    AI_CASE_RETURN(XCB_SELECTION_REQUEST);
+    AI_CASE_RETURN(XCB_SELECTION_NOTIFY);
+    AI_CASE_RETURN(XCB_COLORMAP_NOTIFY);
+    AI_CASE_RETURN(XCB_CLIENT_MESSAGE);
+    AI_CASE_RETURN(XCB_MAPPING_NOTIFY);
+    AI_CASE_RETURN(XCB_GE_GENERIC);
+  }
+  if (rt == m_xkb.opcode())
+    return "XKB_EXTENSION_OPCODE";
+
+  Dout(dc::notice, "Received unknown response_type " << (int)response_type);
+  return "<UNKNOWN RESPONSE TYPE>";
+}
+
 std::string Connection::print_atom(xcb_atom_t atom) const
 {
   xcb_get_atom_name_cookie_t atom_name_cookie = xcb_get_atom_name(m_connection, atom);
@@ -292,12 +358,18 @@ std::string Connection::print_atom(xcb_atom_t atom) const
 
 void Connection::print_on(std::ostream& os, xcb_generic_event_t const& event) const
 {
+  // From https://www.x.org/releases/X11R7.7/doc/xproto/x11protocol.html#Encoding::Events
+  // Events are 32 bytes long. Unused bytes within an event are not guaranteed to be zero.
+  // Every event contains an 8-bit type code. The most significant bit in this code is set if the event was generated from a SendEvent request.
+  // Event codes 64 through 127 are reserved for extensions, although the core protocol does not define a mechanism for selecting interest in such events.
+  // Every core event (with the exception of KeymapNotify) also contains the least significant 16 bits of the sequence number of the last request
+  // issued by the client that was (or is currently being) processed by the server.
   os << '{';
-  os << "response_type:" << response_type_to_string(event.response_type) <<
-    /*", pad0:" << (int)event.pad0 <<*/ ", sequence:" << event.sequence <<
-    /*", pad[]:" << libcwd::buf2str(reinterpret_cast<char const*>(event.pad), sizeof(event.pad)) <<*/
-    ", full_sequence:" << event.full_sequence;
-  switch (event.response_type & 0x7f)
+  os << "response_type:" << response_type_to_string(event.response_type) << ", sequence:" << event.sequence;
+  uint8_t rt = event.response_type & 0x7f;
+  if (rt < 64)
+    os << ", full_sequence:" << event.full_sequence;
+  switch (rt)
   {
     case XCB_KEY_PRESS:
     {
@@ -493,12 +565,55 @@ void Connection::print_on(std::ostream& os, xcb_generic_event_t const& event) co
     case XCB_MAPPING_NOTIFY:
     {
       xcb_mapping_notify_event_t const& ev = reinterpret_cast<xcb_mapping_notify_event_t const&>(event);
+      os << ", request:" << (int)ev.request << ", first_keycode:" << (int)ev.first_keycode << ", count:" << (int)ev.count;
       break;
     }
     case XCB_GE_GENERIC:
     {
       xcb_ge_generic_event_t const& ev = reinterpret_cast<xcb_ge_generic_event_t const&>(event);
       break;
+    }
+    default:
+    {
+      if (rt == m_xkb.opcode())
+      {
+        xkbAnyEvent const& anyev = reinterpret_cast<xkbAnyEvent const&>(event);
+        os << ", xkbType:" << print_xkbType(anyev.xkbType) << ", time: " << anyev.time << ", deviceID:" << (int)anyev.deviceID;
+        switch (anyev.xkbType)
+        {
+          case XCB_XKB_MAP_NOTIFY:
+          {
+            xcb_xkb_map_notify_event_t const& ev = reinterpret_cast<xcb_xkb_map_notify_event_t const&>(anyev);
+
+            os << ", ptrBtnActions:" << (int)ev.ptrBtnActions << ", changed:" << ev.changed <<
+              ", minKeyCode:" << (int)ev.minKeyCode << ", maxKeyCode:" << (int)ev.maxKeyCode <<
+              ", firstType:" << (int)ev.firstType << ", nTypes:" << (int)ev.nTypes << ", firstKeySym:" << (int)ev.firstKeySym <<
+              ", nKeySyms:" << (int)ev.nKeySyms << ", firstKeyAct:" << (int)ev.firstKeyAct << ", nKeyActs:" << (int)ev.nKeyActs <<
+              ", firstKeyBehavior:" << (int)ev.firstKeyBehavior << ", nKeyBehavior:" << (int)ev.nKeyBehavior << ", firstKeyExplicit:" << (int)ev.firstKeyExplicit <<
+              ", nKeyExplicit:" << (int)ev.nKeyExplicit << ", firstModMapKey:" << (int)ev.firstModMapKey << ", nModMapKeys:" << (int)ev.nModMapKeys <<
+              ", firstVModMapKey:" << (int)ev.firstVModMapKey << ", nVModMapKeys:" << (int)ev.nVModMapKeys << ", virtualMods:" << ev.virtualMods;
+            break;
+          }
+          case XCB_XKB_STATE_NOTIFY:
+          {
+            xcb_xkb_state_notify_event_t const& ev = reinterpret_cast<xcb_xkb_state_notify_event_t const&>(anyev);
+
+            os << ", mods:" << (int)ev.mods << ", baseMods:" << (int)ev.baseMods <<
+              ", latchedMods:" << (int)ev.latchedMods << ", lockedMods:" << (int)ev.lockedMods <<
+              ", group:" << (int)ev.group << ", baseGroup:" << ev.baseGroup << ", latchedGroup:" << ev.latchedGroup <<
+              ", lockedGroup:" << (int)ev.lockedGroup << ", compatState:" << (int)ev.compatState <<
+              ", grabMods:" << (int)ev.grabMods << ", compatGrabMods:" << (int)ev.compatGrabMods <<
+              ", lookupMods:" << (int)ev.lookupMods << ", compatLoockupMods:" << (int)ev.compatLoockupMods <<
+              ", ptrBtnState:" << ev.ptrBtnState << ", changed:" << ev.changed <<
+              ", keycode:" << (int)ev.keycode << ", eventType:" << (int)ev.eventType <<
+              ", requestMajor:" << (int)ev.requestMajor << ", requestMinor:" << (int)ev.requestMinor;
+
+            break;
+          }
+        }
+      }
+      else
+        os << "UNKNOWN EXTENSION EVENT TYPE CODE";
     }
   }
   os << '}';
@@ -515,16 +630,22 @@ void Connection::read_from_fd(int& allow_deletion_count, int fd)
   xcb_generic_event_t const* event;
   while ((event = xcb_poll_for_event(m_connection)))
   {
+    uint8_t const rt = event->response_type & 0x7f;
 #ifdef CWDEBUG
-    bool is_motion_notify_event = (event->response_type & 0x7f) == XCB_MOTION_NOTIFY;
-    if (entering_indent.M_indent == 0 && (DEBUGCHANNELS::dc::xcbmotion.is_on() || (DEBUGCHANNELS::dc::xcb.is_on() && !is_motion_notify_event)))
+    if (rt == XCB_FOCUS_IN)
+      m_debug_no_focus = false;
+    if (!m_debug_no_focus && rt != XCB_MAPPING_NOTIFY && (rt != m_xkb.opcode() || reinterpret_cast<xcb_xkb_state_notify_event_t const*>(event)->deviceID == m_xkb.device_id()))
     {
-      Dout(dc::xcb|dc::xcbmotion, "Entering xcb::Connection::read_from_fd()");
-      libcwd::libcw_do.inc_indent(2);
-      entering_indent.M_indent = 2;
+      bool is_motion_notify_event = rt == XCB_MOTION_NOTIFY;
+      if (entering_indent.M_indent == 0 && (DEBUGCHANNELS::dc::xcbmotion.is_on() || (DEBUGCHANNELS::dc::xcb.is_on() && !is_motion_notify_event)))
+      {
+        Dout(dc::xcb|dc::xcbmotion, "Entering xcb::Connection::read_from_fd()");
+        libcwd::libcw_do.inc_indent(2);
+        entering_indent.M_indent = 2;
+      }
+      Dout(dc::xcb(!is_motion_notify_event)|dc::xcbmotion,
+          "Processing event " << print_using(*event, [this](std::ostream& os, xcb_generic_event_t const& event_) { print_on(os, event_); }));
     }
-    Dout(dc::xcb(!is_motion_notify_event)|dc::xcbmotion,
-        "Processing event " << print_using(*event, [this](std::ostream& os, xcb_generic_event_t const& event_) { print_on(os, event_); }));
 #endif
     // Errors of requests which have no reply cause an 'event' with response_type 0 by default,
     // for requests with a reply you have to use the _unchecked version to get the errors delivered here.
@@ -536,7 +657,7 @@ void Connection::read_from_fd(int& allow_deletion_count, int fd)
       continue;
     }
     // Process events
-    switch (event->response_type & 0x7f)
+    switch (rt)
     {
         // Mouse button
       case XCB_BUTTON_PRESS:
@@ -544,36 +665,68 @@ void Connection::read_from_fd(int& allow_deletion_count, int fd)
       {
         // xcb_button_release_event_t is a typedef of xcb_button_press_event_t.
         xcb_button_press_event_t const* ev = reinterpret_cast<xcb_button_press_event_t const*>(event);
-        bool pressed = (event->response_type & 0x7f) == XCB_BUTTON_PRESS;
+        bool pressed = rt == XCB_BUTTON_PRESS;
 
-        uint32_t modifiers = ev->state;
+        uint16_t modifiers = ev->state;
         Dout(dc::xcb, print_modifiers(modifiers));
 
-        Dout(dc::xcb, "Button " << ev->detail << (pressed ? "pressed" : "released") << " in window " << ev->event << ", at coordinates (" << ev->event_x << ", " << ev->event_y << ")");
+        Dout(dc::xcb, "Button " << (int)ev->detail << ' ' << (pressed ? "pressed" : "released") << " in window " << ev->event << ", at coordinates (" << ev->event_x << ", " << ev->event_y << ")");
         WindowBase* window = lookup(ev->event);
-        int converted_modifiers = 0;
+        uint16_t converted_modifiers = 0;
         if (modifiers)
           converted_modifiers = window->convert(modifiers);
-        window->MouseMove(ev->event_x, ev->event_y, converted_modifiers);
-        window->MouseClick(ev->detail, pressed, converted_modifiers);
+        // UNIX mouse buttons start at 1, but we use the convention to start at 0 (like glfw and imgui).
+        // This also allows to use it as an index into an array more naturally.
+        ASSERT(ev->detail > 0);
+        uint8_t button = ev->detail - 1;
+        window->on_mouse_click(ev->event_x, ev->event_y, converted_modifiers, pressed, button);
         break;
       }
-        // Minimize
-      case XCB_UNMAP_NOTIFY:
+        // Mouse movement
+      case XCB_MOTION_NOTIFY:
       {
+        xcb_motion_notify_event_t const* motion_event = reinterpret_cast<xcb_motion_notify_event_t const*>(event);
+
+        uint16_t modifiers = motion_event->state;
+        Dout(dc::xcbmotion, print_modifiers(modifiers));
+
+        WindowBase* window = lookup(motion_event->event);
+        uint16_t converted_modifiers = 0;
+        if (modifiers)
+          converted_modifiers = window->convert(modifiers);
+        window->on_mouse_move(motion_event->event_x, motion_event->event_y, converted_modifiers);
+        break;
+      }
+        // Going in or out of focus.
+      case XCB_FOCUS_IN:
+      case XCB_FOCUS_OUT:
+      {
+        // xcb_focus_in_event_t is a typedef of xcb_focus_out_event_t.
+        xcb_focus_out_event_t const* focus_event = reinterpret_cast<xcb_focus_out_event_t const*>(event);
+        bool in_focus = rt == XCB_FOCUS_IN;
+
+        WindowBase* window = lookup(focus_event->event);
+        if (window)
+          window->on_focus_changed(in_focus);
+
+#ifdef CWDEBUG
+        // I keep receiving XKB events even when out of focus. For now just suppress debug output.
+        m_debug_no_focus = !in_focus;
+#endif
+        break;
+      }
+        // Minimize / Unminimize
+      case XCB_UNMAP_NOTIFY:
+      case XCB_MAP_NOTIFY:
+      {
+        // xcb_map_notify_event_t is a typedef of xcb_unmap_notify_event_t.
         xcb_unmap_notify_event_t const* unmap_event = reinterpret_cast<xcb_unmap_notify_event_t const*>(event);
+        bool minimized = rt == XCB_UNMAP_NOTIFY;
+
         WindowBase* window = lookup(unmap_event->window);
         // The window can already be destroyed (this unmap is then the result of that).
         if (window)
-          window->on_map_changed(true);
-        break;
-      }
-        // Unminimize
-      case XCB_MAP_NOTIFY:
-      {
-        xcb_map_notify_event_t const* map_event = reinterpret_cast<xcb_map_notify_event_t const*>(event);
-        WindowBase* window = lookup(map_event->window);
-        window->on_map_changed(false);
+          window->on_map_changed(minimized);
         break;
       }
         // Resize
@@ -610,8 +763,31 @@ void Connection::read_from_fd(int& allow_deletion_count, int fd)
         break;
       }
       case XCB_KEY_PRESS:
-//        loop = false;
+      case XCB_KEY_RELEASE:
+      {
+        // xcb_key_press_release_t is a typedef of xcb_key_press_event_t.
+        xcb_key_press_event_t const* ev = reinterpret_cast<xcb_key_press_event_t const*>(event);
+        bool pressed = rt == XCB_KEY_PRESS;
+
+        xcb_keycode_t code = ev->detail;
+        xkb_keysym_t keysym = m_xkb.get_one_sym(code);
+        if (keysym < 128)
+          Dout(dc::xcb|continued_cf, "Got character: '" << char2str(keysym) << "'");
+        else
+          Dout(dc::xcb|continued_cf, "Got symbol: " << std::hex << keysym << std::dec);
+
+        xkb_mod_mask_t active_mods = m_xkb.get_active_mods();
+        xkb_mod_mask_t consumed_mods = m_xkb.get_consumed_mods(code);
+        Dout(dc::finish, std::setbase(2) << " with active_mods = " << active_mods << " and consumed_mods = " << consumed_mods << ".");
+
+        WindowBase* window = lookup(ev->event);
+        uint16_t converted_modifiers = 0;
+        uint16_t modifiers = active_mods & ~consumed_mods;
+        if (modifiers)
+          converted_modifiers = window->convert(active_mods & ~consumed_mods);
+        window->on_key_event(ev->event_x, ev->event_y, converted_modifiers, pressed, keysym);
         break;
+      }
       case XCB_DESTROY_NOTIFY:
       {
         xcb_destroy_notify_event_t const* destroy_notify_event = reinterpret_cast<xcb_destroy_notify_event_t const*>(event);
@@ -623,6 +799,52 @@ void Connection::read_from_fd(int& allow_deletion_count, int fd)
         if (remove(destroy_notify_event->window))
           destroyed = true;
 
+        break;
+      }
+      case XCB_ENTER_NOTIFY:
+      case XCB_LEAVE_NOTIFY:
+      {
+        // xcb_leave_notify_event_t is a typedef of xcb_enter_notify_event_t.
+        xcb_enter_notify_event_t const* enter_notify_event = reinterpret_cast<xcb_enter_notify_event_t const*>(event);
+        bool entered = rt == XCB_ENTER_NOTIFY;
+
+        uint16_t modifiers = enter_notify_event->state;
+        Dout(dc::xcb, print_modifiers(modifiers));
+
+        WindowBase* window = lookup(enter_notify_event->event);
+        uint16_t converted_modifiers = 0;
+        if (modifiers)
+          converted_modifiers = window->convert(modifiers);
+        window->on_mouse_enter(enter_notify_event->event_x, enter_notify_event->event_y, converted_modifiers, entered);
+
+        break;
+      }
+      case XCB_MAPPING_NOTIFY:
+        // Ignore - handled in XCB_XKB_MAP_NOTIFY below.
+        break;
+      default:
+      {
+        if (rt == m_xkb.opcode())
+        {
+          xkbAnyEvent const* anyev = reinterpret_cast<xkbAnyEvent const*>(event);
+          if (anyev->deviceID == m_xkb.device_id())
+          {
+            switch (anyev->xkbType)
+            {
+              case XCB_XKB_MAP_NOTIFY:
+              {
+                m_xkb.create_keymap_and_state(m_connection);
+                break;
+              }
+              case XCB_XKB_STATE_NOTIFY:
+              {
+                xcb_xkb_state_notify_event_t const* ev = reinterpret_cast<xcb_xkb_state_notify_event_t const*>(anyev);
+                m_xkb.update_state(ev);
+                break;
+              }
+            }
+          }
+        }
         break;
       }
     }

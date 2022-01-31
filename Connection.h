@@ -6,6 +6,7 @@
 #include "org.freedesktop.Xcb.Error/Errors.h"
 #include "threadsafe/aithreadsafe.h"
 #include "threadsafe/AIReadWriteSpinLock.h"
+#include "Xkb.h"
 #include <xcb/xcb.h>
 #include <string>
 #include <string_view>
@@ -25,11 +26,16 @@ class Connection : public evio::RawInputDevice
   uint16_t m_height = 0;                        // That can be for any window, but since resizing usually happens for
                                                 // one window at a time it can still be used to improve performance a
                                                 // tiny bit.
+  Xkb m_xkb;
 
   using handle_to_window_map_container_t = std::map<xcb_window_t, WindowBase*>;
   using handle_to_window_map_t = aithreadsafe::Wrapper<handle_to_window_map_container_t, aithreadsafe::policy::ReadWrite<AIReadWriteSpinLock>>;
 
   handle_to_window_map_t m_handle_to_window_map;
+
+#ifdef CWDEBUG
+  bool m_debug_no_focus = false;
+#endif
 
  public:
   void connect(std::string display_name);
@@ -86,6 +92,7 @@ class Connection : public evio::RawInputDevice
 #ifdef CWDEBUG
   void print_on(std::ostream& os, xcb_generic_event_t const& event) const;
   std::string print_atom(xcb_atom_t atom) const;
+  char const* response_type_to_string(uint8_t response_type) const;
 #endif
 
  private:

@@ -815,7 +815,10 @@ void Connection::read_from_fd(int& allow_deletion_count, int fd)
         uint16_t converted_modifiers = 0;
         if (modifiers)
           converted_modifiers = window->convert(modifiers);
-        window->on_mouse_enter(enter_notify_event->event_x, enter_notify_event->event_y, converted_modifiers, entered);
+        if (window)
+          window->on_mouse_enter(enter_notify_event->event_x, enter_notify_event->event_y, converted_modifiers, entered);
+        else
+          Dout(dc::warning, "Received " << (entered ? "XCB_ENTER_NOTIFY" : "XCB_LEAVE_NOTIFY") << " for unknown window " << enter_notify_event->event);
 
         break;
       }

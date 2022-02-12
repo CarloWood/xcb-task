@@ -60,7 +60,7 @@ class Connection : public evio::RawInputDevice
   WindowBase* lookup(xcb_window_t handle) const;
 
   // Use the ID returned by generate_id to create a window that is a child window of the root.
-  xcb_void_cookie_t create_main_window(xcb_window_t handle,
+  xcb_void_cookie_t create_window(xcb_window_t handle, xcb_window_t parent_handle,
       int16_t x, int16_t y, uint16_t width, uint16_t height,
       std::string_view const& title,
       uint16_t border_width, uint16_t _class, uint32_t value_mask, std::vector<uint32_t> const& value_list) const;

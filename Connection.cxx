@@ -67,12 +67,14 @@ void Connection::close()
 
 void Connection::add(xcb_window_t handle, WindowBase* window)
 {
+  Dout(dc::xcb, "Connection::add(" << handle << ", " << window << ")");
   handle_to_window_map_t::wat handle_to_window_map_w(m_handle_to_window_map);
   handle_to_window_map_w->emplace(handle_to_window_map_container_t::value_type{handle, window});
 }
 
 void Connection::destroyed(xcb_window_t handle)
 {
+  Dout(dc::xcb, "Connection::destroyed(" << handle << ")");
   handle_to_window_map_t::wat handle_to_window_map_w(m_handle_to_window_map);
   auto iter = handle_to_window_map_w->find(handle);
   // Can this ever happen?
@@ -82,6 +84,7 @@ void Connection::destroyed(xcb_window_t handle)
 
 bool Connection::remove(xcb_window_t handle)
 {
+  Dout(dc::xcb, "Connection::remove(" << handle << ")");
   handle_to_window_map_t::wat handle_to_window_map_w(m_handle_to_window_map);
   handle_to_window_map_w->erase(handle);
   return handle_to_window_map_w->empty();
@@ -96,19 +99,19 @@ WindowBase* Connection::lookup(xcb_window_t handle) const
   return search->second;
 }
 
-xcb_void_cookie_t Connection::create_main_window(xcb_window_t handle,
+xcb_void_cookie_t Connection::create_window(xcb_window_t handle, xcb_window_t parent_handle,
     int16_t x, int16_t y, uint16_t width, uint16_t height,
     std::string_view const& title,
     uint16_t border_width, uint16_t _class, uint32_t value_mask, std::vector<uint32_t> const& value_list) const
 {
-  DoutEntering(dc::notice, "xcb::Connection::create_main_window(" << handle << ", " <<
+  DoutEntering(dc::notice, "xcb::Connection::create_window(" << handle << ", " << parent_handle << ", " <<
       x << ", " << y << ", " << width << ", " << height << ", \"" << title << "\", " <<
       border_width << ", " << _class << ", 0x" << std::hex << value_mask << std::dec << ", " << value_list << ")");
 
-  // value_list should have an entry for each bit in value_mask.
+  // value_list must have an entry for exactly each bit set in value_mask.
   ASSERT(utils::popcount(value_mask) == value_list.size());
 
-  xcb_void_cookie_t ret = xcb_create_window(m_connection, XCB_COPY_FROM_PARENT, handle, m_screen->root,
+  xcb_void_cookie_t ret = xcb_create_window(m_connection, XCB_COPY_FROM_PARENT, handle, parent_handle ? parent_handle : m_screen->root,
       x, y, width, height,
       border_width, _class, m_screen->root_visual, value_mask, value_list.data());
 
@@ -613,7 +616,7 @@ void Connection::print_on(std::ostream& os, xcb_generic_event_t const& event) co
         }
       }
       else
-        os << "UNKNOWN EXTENSION EVENT TYPE CODE";
+        os << ", ???";
     }
   }
   os << '}';
@@ -632,7 +635,7 @@ void Connection::read_from_fd(int& allow_deletion_count, int fd)
   {
     uint8_t const rt = event->response_type & 0x7f;
 #ifdef CWDEBUG
-    if (rt == XCB_FOCUS_IN)
+    if (rt == XCB_FOCUS_IN || rt == XCB_DESTROY_NOTIFY)
       m_debug_no_focus = false;
     if (!m_debug_no_focus && rt != XCB_MAPPING_NOTIFY && (rt != m_xkb.opcode() || reinterpret_cast<xcb_xkb_state_notify_event_t const*>(event)->deviceID == m_xkb.device_id()))
     {
@@ -793,8 +796,12 @@ void Connection::read_from_fd(int& allow_deletion_count, int fd)
         xcb_destroy_notify_event_t const* destroy_notify_event = reinterpret_cast<xcb_destroy_notify_event_t const*>(event);
 #ifdef CWDEBUG
         WindowBase* window = lookup(destroy_notify_event->window);
-        // destroyed should have been called before we can receive this message!?
-        ASSERT(window == nullptr);
+        // destroyed should have been called before we can receive this message!
+        // This CAN happen for the child window of a window that is being closed, but it shouldn't
+        // happen because the program should close child windows before the parent window.
+        // We can't assert here however, because *theoretically* there is a race and even under
+        // normal circumstances it is theotretically possible that the call to destroyed got delayed.
+        Dout(dc::warning(window != nullptr), "Received a XCB_DESTROY_NOTIFY for a window for which destroyed() wasn't called yet?!");
 #endif
         if (remove(destroy_notify_event->window))
           destroyed = true;

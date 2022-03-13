@@ -9,10 +9,6 @@
 #include <iosfwd>
 
 namespace task {
-class XcbConnection;
-} // namespace task;
-
-namespace task {
 
 class XcbConnection : public AIStatefulTask, public xcb::ConnectionData
 {

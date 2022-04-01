@@ -101,7 +101,7 @@ WindowBase* Connection::lookup(xcb_window_t handle) const
 
 xcb_void_cookie_t Connection::create_window(xcb_window_t handle, xcb_window_t parent_handle,
     int16_t x, int16_t y, uint16_t width, uint16_t height,
-    std::string_view const& title,
+    std::u8string_view const& title,
     uint16_t border_width, uint16_t _class, uint32_t value_mask, std::vector<uint32_t> const& value_list) const
 {
   DoutEntering(dc::notice, "xcb::Connection::create_window(" << handle << ", " << parent_handle << ", " <<
@@ -117,7 +117,7 @@ xcb_void_cookie_t Connection::create_window(xcb_window_t handle, xcb_window_t pa
 
   xcb_change_property(m_connection, XCB_PROP_MODE_REPLACE, handle,
     XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8,
-    title.size(), title.data());
+    title.size(), reinterpret_cast<char const*>(title.data())); // Pretty sure they mean utf8 encoded strings too.
 
   xcb_change_property(m_connection, XCB_PROP_MODE_REPLACE, handle, m_wm_protocols_atom, 4, 32, 1, &m_wm_delete_window_atom);
 

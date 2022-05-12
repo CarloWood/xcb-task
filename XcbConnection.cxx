@@ -34,8 +34,7 @@ char const* XcbConnection::state_str_impl(state_type run_state) const
     AI_CASE_RETURN(XcbConnection_start);
     AI_CASE_RETURN(XcbConnection_done);
   }
-  ASSERT(false);
-  return "UNKNOWN STATE";
+  AI_NEVER_REACHED;
 }
 
 void XcbConnection::initialize_impl()

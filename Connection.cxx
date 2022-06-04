@@ -675,14 +675,19 @@ void Connection::read_from_fd(int& allow_deletion_count, int fd)
 
         Dout(dc::xcb, "Button " << (int)ev->detail << ' ' << (pressed ? "pressed" : "released") << " in window " << ev->event << ", at coordinates (" << ev->event_x << ", " << ev->event_y << ")");
         WindowBase* window = lookup(ev->event);
-        uint16_t converted_modifiers = 0;
-        if (modifiers)
-          converted_modifiers = window->convert(modifiers);
-        // UNIX mouse buttons start at 1, but we use the convention to start at 0 (like glfw and imgui).
-        // This also allows to use it as an index into an array more naturally.
-        ASSERT(ev->detail > 0);
-        uint8_t button = ev->detail - 1;
-        window->on_mouse_click(ev->event_x, ev->event_y, converted_modifiers, pressed, button);
+        if (AI_LIKELY(window))
+        {
+          uint16_t converted_modifiers = 0;
+          if (modifiers)
+            converted_modifiers = window->convert(modifiers);
+          // UNIX mouse buttons start at 1, but we use the convention to start at 0 (like glfw and imgui).
+          // This also allows to use it as an index into an array more naturally.
+          ASSERT(ev->detail > 0);
+          uint8_t button = ev->detail - 1;
+          window->on_mouse_click(ev->event_x, ev->event_y, converted_modifiers, pressed, button);
+        }
+        else
+          Dout(dc::warning, "Received " << (pressed ? "XCB_BUTTON_PRESS" : "XCB_BUTTON_RELEASE") << " for destroyed() window " << ev->event);
         break;
       }
         // Mouse movement
@@ -694,10 +699,15 @@ void Connection::read_from_fd(int& allow_deletion_count, int fd)
         Dout(dc::xcbmotion, print_modifiers(modifiers));
 
         WindowBase* window = lookup(motion_event->event);
-        uint16_t converted_modifiers = 0;
-        if (modifiers)
-          converted_modifiers = window->convert(modifiers);
-        window->on_mouse_move(motion_event->event_x, motion_event->event_y, converted_modifiers);
+        if (AI_LIKELY(window))
+        {
+          uint16_t converted_modifiers = 0;
+          if (modifiers)
+            converted_modifiers = window->convert(modifiers);
+          window->on_mouse_move(motion_event->event_x, motion_event->event_y, converted_modifiers);
+        }
+        else
+          Dout(dc::warning, "Received " << "XCB_MOTION_NOTIFY" << " for destroyed() window " << motion_event->event);
         break;
       }
         // Going in or out of focus.
@@ -819,13 +829,15 @@ void Connection::read_from_fd(int& allow_deletion_count, int fd)
         Dout(dc::xcb, print_modifiers(modifiers));
 
         WindowBase* window = lookup(enter_notify_event->event);
-        uint16_t converted_modifiers = 0;
-        if (modifiers)
-          converted_modifiers = window->convert(modifiers);
         if (window)
+        {
+          uint16_t converted_modifiers = 0;
+          if (modifiers)
+            converted_modifiers = window->convert(modifiers);
           window->on_mouse_enter(enter_notify_event->event_x, enter_notify_event->event_y, converted_modifiers, entered);
+        }
         else
-          Dout(dc::warning, "Received " << (entered ? "XCB_ENTER_NOTIFY" : "XCB_LEAVE_NOTIFY") << " for unknown window " << enter_notify_event->event);
+          Dout(dc::warning, "Received " << (entered ? "XCB_ENTER_NOTIFY" : "XCB_LEAVE_NOTIFY") << " for destroyed() window " << enter_notify_event->event);
 
         break;
       }

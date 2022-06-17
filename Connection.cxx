@@ -2,8 +2,10 @@
 #include "Connection.h"
 #include "Xkb.h"
 #include <X11/extensions/XKBproto.h>    // xkbAnyEvent
-#ifdef CWDEBUG
+#if CW_DEBUG
 #include "utils/popcount.h"
+#endif
+#ifdef CWDEBUG
 #include <libcwd/buf2str.h>
 #endif
 

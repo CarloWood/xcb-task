@@ -49,6 +49,7 @@ class XcbConnection : public AIStatefulTask, public xcb::ConnectionData
 
   /// Implementation of state_str for run states.
   char const* state_str_impl(state_type run_state) const override;
+  char const* task_name_impl() const override;
 
   /// Run bs_initialize.             
   void initialize_impl() override;

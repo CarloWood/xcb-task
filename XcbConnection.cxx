@@ -37,6 +37,11 @@ char const* XcbConnection::state_str_impl(state_type run_state) const
   AI_NEVER_REACHED;
 }
 
+char const* XcbConnection::task_name_impl() const
+{
+  return "XcbConnection";
+}
+
 void XcbConnection::initialize_impl()
 {
   DoutEntering(dc::statefultask(mSMDebug), "XcbConnection::initialize_impl() [" << (void*)this << "]");

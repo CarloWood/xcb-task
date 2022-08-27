@@ -47,6 +47,16 @@ void Connection::connect(std::string display_name)
   m_wm_delete_window_atom = delete_reply->atom;
   free(delete_reply);
 
+  xcb_intern_atom_cookie_t  utf8_string_cookie = xcb_intern_atom(m_connection, 0, 11, "UTF8_STRING");
+  xcb_intern_atom_reply_t*  utf8_string_reply  = xcb_intern_atom_reply(m_connection, utf8_string_cookie, 0);
+  m_utf8_string_atom = utf8_string_reply->atom;
+  free(utf8_string_reply);
+
+  xcb_intern_atom_cookie_t  net_wm_name_cookie = xcb_intern_atom(m_connection, 0, 12, "_NET_WM_NAME");
+  xcb_intern_atom_reply_t*  net_wm_name_reply  = xcb_intern_atom_reply(m_connection, net_wm_name_cookie, 0);
+  m_net_wm_name_atom = net_wm_name_reply->atom;
+  free(net_wm_name_reply);
+
   int fd = xcb_get_file_descriptor(m_connection);
   fd_init(fd);
 
@@ -103,7 +113,7 @@ WindowBase* Connection::lookup(xcb_window_t handle) const
 
 xcb_void_cookie_t Connection::create_window(xcb_window_t handle, xcb_window_t parent_handle,
     int16_t x, int16_t y, uint16_t width, uint16_t height,
-    std::u8string_view const& title,
+    std::u8string instance_name, std::u8string const& class_name, std::u8string const& title,
     uint16_t border_width, uint16_t _class, uint32_t value_mask, std::vector<uint32_t> const& value_list) const
 {
   DoutEntering(dc::notice, "xcb::Connection::create_window(" << handle << ", " << parent_handle << ", " <<
@@ -117,9 +127,22 @@ xcb_void_cookie_t Connection::create_window(xcb_window_t handle, xcb_window_t pa
       x, y, width, height,
       border_width, _class, m_screen->root_visual, value_mask, value_list.data());
 
+  // Set window name.
   xcb_change_property(m_connection, XCB_PROP_MODE_REPLACE, handle,
-    XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8,
-    title.size(), reinterpret_cast<char const*>(title.data())); // Pretty sure they mean utf8 encoded strings too.
+    XCB_ATOM_WM_NAME, m_utf8_string_atom, 8,
+    title.size(), title.data());
+  xcb_change_property(m_connection, XCB_PROP_MODE_REPLACE, handle,
+    m_net_wm_name_atom, m_utf8_string_atom, 8,
+    title.size(), title.data());
+
+  ASSERT(!instance_name.empty() && !class_name.empty());
+  std::transform(instance_name.begin(), instance_name.end(), instance_name.begin(), [](char c){ return std::tolower(c); });
+  std::u8string instance_class = instance_name + u8'\0' + class_name + u8'\0';
+
+  // Set window instance and class.
+  xcb_change_property(m_connection, XCB_PROP_MODE_REPLACE, handle,
+    XCB_ATOM_WM_CLASS, XCB_ATOM_STRING, 8,
+    instance_class.size(), instance_class.data());
 
   xcb_change_property(m_connection, XCB_PROP_MODE_REPLACE, handle, m_wm_protocols_atom, 4, 32, 1, &m_wm_delete_window_atom);
 

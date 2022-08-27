@@ -22,6 +22,8 @@ class Connection : public evio::RawInputDevice
   xcb_screen_t* m_screen = nullptr;
   xcb_atom_t m_wm_protocols_atom;
   xcb_atom_t m_wm_delete_window_atom;
+  xcb_atom_t m_utf8_string_atom;
+  xcb_atom_t m_net_wm_name_atom;
   uint16_t m_width = 0;                         // The width/height of the last XCB_CONFIGURE_NOTIFY that was received.
   uint16_t m_height = 0;                        // That can be for any window, but since resizing usually happens for
                                                 // one window at a time it can still be used to improve performance a
@@ -62,7 +64,7 @@ class Connection : public evio::RawInputDevice
   // Use the ID returned by generate_id to create a window that is a child window of the root.
   xcb_void_cookie_t create_window(xcb_window_t handle, xcb_window_t parent_handle,
       int16_t x, int16_t y, uint16_t width, uint16_t height,
-      std::u8string_view const& title,
+      std::u8string instance_name, std::u8string const& class_name, std::u8string const& title,
       uint16_t border_width, uint16_t _class, uint32_t value_mask, std::vector<uint32_t> const& value_list) const;
 
   // Destroy a window using its ID (as returned by generate_id).

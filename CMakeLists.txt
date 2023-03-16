@@ -5,10 +5,6 @@ project(xcb-task
   LANGUAGES CXX
 )
 
-# Require support for C++20.
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
 #==============================================================================
 # DEPENDENCIES
 #
@@ -29,6 +25,9 @@ pkg_check_modules(Libxcb-xkb xcb-xkb IMPORTED_TARGET)
 
 # This project is an OBJECT-library, used by other git submodules and the main project.
 add_library(xcb-task_ObjLib OBJECT)
+
+# Require at least support for C++20.
+target_compile_features(xcb-task_ObjLib PUBLIC cxx_std_20)
 
 # Set SOURCE_DIR to the current directory.
 set_property(

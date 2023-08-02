@@ -4,7 +4,7 @@
 #include "evio/RawInputDevice.h"
 #include "evio/RawOutputDevice.h"
 #include "org.freedesktop.Xcb.Error/Errors.h"
-#include "threadsafe/aithreadsafe.h"
+#include "threadsafe/threadsafe.h"
 #include "threadsafe/AIReadWriteSpinLock.h"
 #include "Xkb.h"
 #include <xcb/xcb.h>
@@ -31,7 +31,7 @@ class Connection : public evio::RawInputDevice
   Xkb m_xkb;
 
   using handle_to_window_map_container_t = std::map<xcb_window_t, WindowBase*>;
-  using handle_to_window_map_t = aithreadsafe::Wrapper<handle_to_window_map_container_t, aithreadsafe::policy::ReadWrite<AIReadWriteSpinLock>>;
+  using handle_to_window_map_t = threadsafe::Unlocked<handle_to_window_map_container_t, threadsafe::policy::ReadWrite<AIReadWriteSpinLock>>;
 
   handle_to_window_map_t m_handle_to_window_map;
 

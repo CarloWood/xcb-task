@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12...3.16)
+cmake_minimum_required(VERSION 3.15...3.30)
 
 project(xcb-task
   DESCRIPTION "AIStatefulTask submodule - xcb support"
@@ -28,12 +28,6 @@ add_library(xcb-task_ObjLib OBJECT)
 
 # Require at least support for C++20.
 target_compile_features(xcb-task_ObjLib PUBLIC cxx_std_20)
-
-# Set SOURCE_DIR to the current directory.
-set_property(
-  TARGET xcb-task_ObjLib
-  PROPERTY SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}"
-)
 
 # The list of source files.
 target_sources(xcb-task_ObjLib

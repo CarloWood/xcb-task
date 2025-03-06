@@ -102,8 +102,8 @@ void ConnectionData::canonicalize()
   try
   {
     std::array<std::string_view, 2> tokens;
-    utils::splitN(display_name, ':', tokens);   // Exactly one colon is required, otherwise this will throw AIAlert::Error.
-    std::string hostname = tokens[0].empty() ? std::string("unix") : std::string(tokens[0]);
+    utils::splitN(display_name, ':', tokens);           // Exactly one colon is required, otherwise this will throw AIAlert::Error.
+    std::string hostname = std::string(tokens[0]);      // If tokens[0] is empty, we should use an empty hostname (for local connections).
     char const* ptr = tokens[1].data();
     unsigned int display_number = read_unsigned_int(ptr);
     if (*ptr != '.' && *ptr != 0)
